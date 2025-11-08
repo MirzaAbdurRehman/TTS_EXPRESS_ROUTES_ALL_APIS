@@ -5,13 +5,91 @@ const app = express.Router();
 const connectDB = require('./db/connect_db');
 connectDB();
 
+const fs = require('fs');
+const path = require('path');
+
 const multer = require('multer');
 
 const empModel = require('./models/emp_model');
 const fileModel = require('./models/file_model');
+const productModel = require('./models/product_model');
 
 // ✅ Import Middleware from `protect.js`
 const { extractToken, protect } = require("./Middleware/project");
+
+
+// cors
+
+app.use(cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+}))
+
+
+const storage = multer.memoryStorage();
+const upload = multer({
+    storage: storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
+    fileFilter: (req, file, callback) => {
+        const fileTypes = /jpeg|jpg|png|gif/;
+        const extName = fileTypes.test(path.extname(file.originalname).toLowerCase());
+        const mimeType = fileTypes.test(file.mimetype);
+        if(extName && mimeType){
+            return callback(null, true);
+        }else{
+            callback('Error: Images Only! (JPEG, JPG, PNG, GIF)');
+        }
+    }
+})
+
+
+if(!fs.existsSync('./uploads')) fs.mkdirSync('./uploads');
+
+app.post('/addProduct', upload.single('image'), async (req, res) => {
+    try{
+        const {
+            name, description, price, discountPrice,
+             category, stock, isFeatured, ratings} = req.body;
+
+        // prepare image data
+
+        let image = null;
+        if (req.file) {
+            image = {
+                data: req.file.buffer,
+                contentType: req.file.mimetype   // e.g:  image/jpeg
+            };
+        }
+
+        const newProduct = new productModel({
+            name,
+            description,
+            price,
+            discountPrice,
+            category,
+            stock,
+            isFeatured,
+            ratings,
+            image
+        });
+
+        const addedProduct =  await newProduct.save();
+        console.log('Product added:', addedProduct);
+
+        // Optional: Remove image binary data from response to save bandwidth
+        const responseProduct = addedProduct.toObject();
+        if (responseProduct.image && responseProduct.image.data) {
+            delete responseProduct.image.data; // delete binary data from response 
+        }
+        res.status(201).json(responseProduct);
+
+
+    }catch(error){
+        console.error('Error adding product:', error);
+        res.status(500).send('Server error');
+    }
+})
 
 
 
@@ -51,6 +129,26 @@ app.get('/employee', async (req, res) => {   // get api to fetch all employees
         res.status(500).send('Server error');
     }
 });
+
+
+
+
+
+// New Work 8/11/2025   Product Model Work With Image as Binary Data
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 app.get('/employee/:id', async (req, res) => {   // get api to fetch employee by id
