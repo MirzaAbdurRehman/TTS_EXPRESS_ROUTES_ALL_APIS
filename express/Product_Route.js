@@ -1,14 +1,14 @@
 
+require('dotenv').config();  // ✅ Load environment variables from .env file
+
 const express = require('express');
 const app = express.Router();
 
-const connectDB = require('./db/connect_db');
-connectDB();
-
 const fs = require('fs');
 const path = require('path');
-
+const cors = require('cors');
 const multer = require('multer');
+const jwt = require('jsonwebtoken');
 
 const empModel = require('./models/emp_model');
 const fileModel = require('./models/file_model');
@@ -16,6 +16,7 @@ const productModel = require('./models/product_model');
 
 // ✅ Import Middleware from `protect.js`
 const { extractToken, protect } = require("./Middleware/project");
+const { default: mongoose } = require('mongoose');
 
 
 // cors
@@ -90,6 +91,63 @@ app.post('/addProduct', upload.single('image'), async (req, res) => {
         res.status(500).send('Server error');
     }
 })
+
+
+// helper function for image conversion binarty to string using base64 Algorithim
+
+const formatProductImage = (product) => {
+    const pro = product.toObject ? product.toObject() : {...product};
+
+    if(pro.image && pro.image.data){
+        if(pro.image.data.buffer){
+            // Compass Binary Object
+             pro.image.data = pro.image.data.buffer.toString("base64");
+        }else if(Buffer.isBuffer(pro.image.data)){
+        pro.image.data = pro.image.data.toString("base64");
+         }
+         else if (pro.image.data.data){
+        pro.image.data = Buffer.from(pro.image.data).toString("base64");
+    }
+}
+return pro;
+}
+
+// Get Api all Data
+
+app.get("/productlist", async (req, res) => {
+    try{
+        const products = await productModel.find();
+        const formattedImage = products.map(formatProductImage);
+        res.status(200).json(formattedImage); 
+    }catch(error){
+        res.status(500).json({message: "Server Error"});
+    }
+})
+
+
+// as a searching api
+
+app.get("/productlist/:id", async (req, res) => {
+    try{
+        const {id} = req.params;
+        if(!mongoose.Types.ObjectId.isValid(id)) {
+            res.status(400).json({message: "Product Id Invalid"});
+        }
+        const product = await productModel.findById(id);
+        if(!product) return res.status(401).json({message: "Product Not Found!..."});
+        res.json(formatProductImage(product));
+
+    }catch(error){
+        res.status(500).json({message: "Server Error"});
+    }
+})
+
+
+
+
+
+
+
 
 
 
@@ -278,7 +336,7 @@ app.post('/login', extractToken,protect,(req, res) => {
         email: 'kashif12@gmail.com'
     }
     // Generate Token
-    const token = jwt.sign({user}, secretKey, {expiresIn: '300s'});  // token siging
+    const token = jwt.sign({user}, process.env.JWT_SECRET, {expiresIn: '300s'});  // token siging
     res.status(200).json({token});
 });
 
