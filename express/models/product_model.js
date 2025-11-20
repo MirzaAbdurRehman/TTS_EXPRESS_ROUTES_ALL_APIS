@@ -9,6 +9,7 @@ const productModel = new mongoose.Schema({
     discountPrice: {type: Number},
     category: {type: String, required: true},
     stock: {type: Number, required: true, min: 0},
+    sku: {type: String, unique: true},
     isFeatured: {type: Boolean, default: false},
     ratings: {type: Number, default: 0, min: 0, max: 5},
 

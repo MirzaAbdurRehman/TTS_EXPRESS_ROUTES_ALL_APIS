@@ -17,6 +17,7 @@ const productModel = require('./models/product_model');
 // ✅ Import Middleware from `protect.js`
 const { extractToken, protect } = require("./Middleware/project");
 const { default: mongoose } = require('mongoose');
+const { exists } = require('./models/user_model');
 
 
 // cors
@@ -125,7 +126,7 @@ app.get("/productlist", async (req, res) => {
 })
 
 
-// as a searching api
+// Get Product by ID (used as a searching api )
 
 app.get("/productlist/:id", async (req, res) => {
     try{
@@ -144,7 +145,89 @@ app.get("/productlist/:id", async (req, res) => {
 
 
 
+// Update Product Data 
 
+app.put("/productListUpdate/:id", upload.single("image"), async(req, res) =>{
+    try{
+        const {id} =  req.params;
+        if(!mongoose.Types.ObjectId.isValid(id)) {
+            res.status(400).json({message: "Invalid Product Id"});
+        }
+
+        const UpdatePersonData = {
+            name: req.body.name,
+            description: req.body.description,
+            price: req.body.price,
+            discountPrice: req.body.discountPrice,
+            category: req.body.category,
+            stock: req.body.stock,
+            isFeatured: req.body.isFeatured === "true" || req.body.isFeatured === "true",
+            ratings: req.body.ratings,
+        }
+
+        // Handle Image Update
+
+        if(req.file){
+            UpdatePersonData.image = {
+                data: req.file.buffer,
+                contentType: req.file.mimetype,
+            }
+        }
+
+        const updateResult =  await UpdatePersonData.findByIdAndUpdate(id, UpdatePersonData, {
+            new: true,
+            runValidators: true
+        })
+
+        if(!updateResult) return res.status(404).json({message: "Preoduct Not Found"})
+        res.json(formatProductImage(updateResult));
+
+    }catch(error){
+        console.error('UpdateData: ', error);
+        res.status(500).json({message: "Server Error"});
+    }
+})
+
+
+app.get('/checkSKU/:sku', async (req, res) => {
+    try{
+        const {sku} = req.params;
+        const existing = await productModel.findOne({sku});
+        res.json({
+            exists: !!existing,
+            productID: existing?existing._id?.toString() : null,
+        })
+    }catch(error){
+        res.status(500).json({message: "Server Error"});
+    }
+})
+
+
+
+// Delete Product Data
+
+app.delete('productDelete/:id', async(req, res) => {
+    try{
+         const {id} =  req.params;
+           if(!mongoose.Types.ObjectId.isValid(id)) {
+            res.status(400).json({message: "Invalid Product Id"});
+
+            const deleteProduct = await productModel.findByIdAndDelete(id);
+
+            if(!deleteProduct) {
+                res.status(404).json({message: "Product Not Found"});
+            } else {
+                res.status(200).json({message: "Product Deleted Successfully"});
+                formatProductImage(deleteProduct);
+            }
+        }
+
+    }catch(error){
+        console.error("Delete Data: ", error)
+        res.status(500).json({message: "Server Error"});
+    }
+
+})
 
 
 
