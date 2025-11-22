@@ -1,46 +1,55 @@
 const express = require('express');
+const cors = require('cors');
 const app = express.Router();
 
-const userModel = require('./models/user_model');
+const userModel = require('./models/signup_user_model');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 
 const { extractToken, protect } = require('./Middleware/project');
 const secretKey = process.env.JWT_SECRET;
 
+
+app.use(cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+}))
+
+
 // ✅ Signup Route
 app.post('/signup', async (req, res) => {
-  const { userName, email, password, address, phone } = req.body;
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
 
   try {
-    const existingUser = await userModel.findOne({ $or: [{ email }, { phone }] });
+    const existingUser = await userModel.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: 'User already exists with this email or phone' });
+      return res.status(400).json({ message: 'User already exists with this email' });
     }
 
     const newUser = new userModel({
-      userName,
       email,
       password,
-      address,
-      phone,
+      userName: email.split('@')[0],
     });
 
     await newUser.save();
 
-    const token = jwt.sign({ _id: newUser._id, email: newUser.email }, secretKey, {
+    const token = jwt.sign({ id: newUser._id, email: newUser.email }, secretKey, {
       expiresIn: '500s',
     });
 
-    res.json({
+    res.status(201).json({
       message: 'User Registered Successfully',
       token,
       user: {
         id: newUser._id,
-        username: newUser.userName,
+        username: newUser.userName || null,
         email: newUser.email,
-        address: newUser.address,
-        phone: newUser.phone,
       },
     });
   } catch (error) {
