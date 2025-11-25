@@ -1,34 +1,44 @@
 const express = require('express');
-const app = express(); 
+const cors = require('cors');
+const app = express();
 
-require('dotenv').config();  // Load environment variables first
+require('dotenv').config();
 
-// Import database connection
+// Import DB
 const connectDB = require('./db/connect_db');
 
-// Middleware is must before routing bcz it show error parsing error arha hai 
-app.use(express.json({ strict: false })); // Yeh ensure karega ke empty body error na de
+// GLOBAL CORS (THIS FIXES YOUR ISSUE)
+app.use(cors({
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+}));
 
-// ✅ Middleware to handle empty JSON request
+// Body parser
+app.use(express.json({ strict: false }));
+
+// Handle invalid JSON
 app.use((err, req, res, next) => {
     if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
-      return res.status(400).json({ message: "Invalid JSON format" });
+        return res.status(400).json({ message: "Invalid JSON format" });
     }
     next();
 });
 
-const route = require('./routes');  // this is for routing
+// Routes
+const route = require('./routes');
+app.use('/api', route);
 
-app.use('/api', route);  // Use the routes defined in routes.js with /api prefix
+const PORT = process.env.PORT || 5001;
 
-const PORT = process.env.PORT || 3000; // Use Render PORT or default 3000
-
-// Connect to MongoDB and start server
-connectDB().then(() => {
-    app.listen(PORT, () => {
-        console.log(`Server is running on port: ${PORT}`);
+// Connect DB + Start server
+connectDB()
+    .then(() => {
+        app.listen(PORT, () => {
+            console.log(`Server running on port ${PORT}`);
+        });
+    })
+    .catch((error) => {
+        console.error('DB connection failed. Server not started.', error);
+        process.exit(1);
     });
-}).catch((error) => {
-    console.error('Failed to connect to MongoDB. Server not started.', error);
-    process.exit(1);
-});
